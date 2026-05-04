@@ -1,4 +1,4 @@
-using LinearAlgebra: Diagonal, I, Symmetric, norm, diag
+using LinearAlgebra: Diagonal, I, Symmetric, diag
 using SparseArrays: SparseArrays, sparse, spzeros, SparseMatrixCSC
 using Test
 using MathOptScaling:
