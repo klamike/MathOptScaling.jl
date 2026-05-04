@@ -1,4 +1,4 @@
-@inline function atomic_max!(dst, i, value)
+@inline atomic_max!(dst, i, value) = begin
     old = dst[i]
     while value > old
         result = Atomix.@atomicreplace dst[i] old => value
@@ -8,7 +8,7 @@
     return
 end
 
-@inline function atomic_min_nonzero!(dst, i, value)
+@inline atomic_min_nonzero!(dst, i, value) = begin
     iszero(value) && return
     old = dst[i]
     while value < old
@@ -19,7 +19,7 @@ end
     return
 end
 
-@inline function atomic_hypot!(dst, i, value)
+@inline atomic_hypot!(dst, i, value) = begin
     iszero(value) && return
     old = dst[i]
     while true
@@ -32,7 +32,7 @@ end
 
 @inline atomic_combine!(dst, i, x, _, ::Val{:max}) = atomic_max!(dst, i, abs(x))
 @inline atomic_combine!(dst, i, x, _, ::Val{:hypot}) = atomic_hypot!(dst, i, x)
-@inline function atomic_combine!(dst, i, x, p, ::Val{:sum})
+@inline atomic_combine!(dst, i, x, p, ::Val{:sum}) = begin
     val = abs_power(x, p)
     iszero(val) || @inbounds Atomix.@atomic dst[i] += val
     return
