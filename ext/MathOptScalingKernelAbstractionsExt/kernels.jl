@@ -53,8 +53,10 @@ end
         a = abs(nzval[k])
         if !iszero(a)
             i, j = rowval[k], colval[k]
-            atomic_min_nonzero!(rowmin, i, a); atomic_max!(rowmax, i, a)
-            atomic_min_nonzero!(colmin, j, a); atomic_max!(colmax, j, a)
+            atomic_min_nonzero!(rowmin, i, a)
+            atomic_max!(rowmax, i, a)
+            atomic_min_nonzero!(colmin, j, a)
+            atomic_max!(colmax, j, a)
         end
     end
 end
@@ -70,7 +72,8 @@ end
         a = abs(nzval[k])
         if !iszero(a)
             i = idx[k]
-            atomic_min_nonzero!(dstmin, i, a); atomic_max!(dstmax, i, a)
+            atomic_min_nonzero!(dstmin, i, a)
+            atomic_max!(dstmax, i, a)
         end
     end
 end

@@ -226,7 +226,8 @@ function row_minmaxabs!(rowmin::AbstractVector{T}, rowmax::AbstractVector{T}, _,
         a = abs(A.nzval[k])
         if !iszero(a)
             i = A.rowval[k]
-            rowmin[i] = min(rowmin[i], a); rowmax[i] = max(rowmax[i], a)
+            rowmin[i] = min(rowmin[i], a)
+            rowmax[i] = max(rowmax[i], a)
         end
     end
     @inbounds for i in eachindex(rowmin, rowmax)
@@ -240,7 +241,8 @@ function col_minmaxabs!(_, _, colmin::AbstractVector{T}, colmax::AbstractVector{
         a = abs(A.nzval[k])
         if !iszero(a)
             j = A.colval[k]
-            colmin[j] = min(colmin[j], a); colmax[j] = max(colmax[j], a)
+            colmin[j] = min(colmin[j], a)
+            colmax[j] = max(colmax[j], a)
         end
     end
     @inbounds for j in eachindex(colmin, colmax)
@@ -249,17 +251,31 @@ function col_minmaxabs!(_, _, colmin::AbstractVector{T}, colmax::AbstractVector{
     return colmin, colmax
 end
 
-scale_rows_cols!(A::AbstractMatrix, rscale::AbstractVector, cscale::AbstractVector) =
-    (A .*= rscale .* transpose(cscale); A)
-scale_rows!(A::AbstractMatrix, rscale::AbstractVector) = (A .*= rscale; A)
-scale_cols!(A::AbstractMatrix, cscale::AbstractVector) = (A .*= transpose(cscale); A)
+function scale_rows_cols!(A::AbstractMatrix, rscale::AbstractVector, cscale::AbstractVector)
+    A .*= rscale .* transpose(cscale)
+    return A
+end
+function scale_rows!(A::AbstractMatrix, rscale::AbstractVector)
+    A .*= rscale
+    return A
+end
+function scale_cols!(A::AbstractMatrix, cscale::AbstractVector)
+    A .*= transpose(cscale)
+    return A
+end
 
-scale_rows_cols!(A::SparseCOO, rscale::AbstractVector, cscale::AbstractVector) =
-    (A.nzval .*= view(rscale, A.rowval) .* view(cscale, A.colval); A)
-scale_rows!(A::SparseCOO, rscale::AbstractVector) =
-    (A.nzval .*= view(rscale, A.rowval); A)
-scale_cols!(A::SparseCOO, cscale::AbstractVector) =
-    (A.nzval .*= view(cscale, A.colval); A)
+function scale_rows_cols!(A::SparseCOO, rscale::AbstractVector, cscale::AbstractVector)
+    A.nzval .*= view(rscale, A.rowval) .* view(cscale, A.colval)
+    return A
+end
+function scale_rows!(A::SparseCOO, rscale::AbstractVector)
+    A.nzval .*= view(rscale, A.rowval)
+    return A
+end
+function scale_cols!(A::SparseCOO, cscale::AbstractVector)
+    A.nzval .*= view(cscale, A.colval)
+    return A
+end
 
 function run_iterative_scaling!(
     ws;

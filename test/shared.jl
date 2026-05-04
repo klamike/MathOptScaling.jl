@@ -22,7 +22,9 @@ function densify(A)
     A isa SparseCOO || return Array(A)
     M = zeros(eltype(A), size(A))
     r, c, v = Array(A.rowval), Array(A.colval), Array(A.nzval)
-    @inbounds for k in eachindex(v); M[r[k], c[k]] = v[k]; end
+    @inbounds for k in eachindex(v)
+        M[r[k], c[k]] = v[k]
+    end
     return M
 end
 
