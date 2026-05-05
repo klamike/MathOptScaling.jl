@@ -17,12 +17,17 @@ end
 run_backend_tests("CPU", identity)
 
 @testset "CurtisReid" begin
-    @testset "M$i / $fname" for (i, M) in enumerate(MATRICES), (fname, mk) in (("dense", identity), ("COO", x -> coo_arr(identity, x)))
+    @testset "M$i / $fname / $solver" for
+            (i, M) in enumerate(MATRICES),
+            (fname, mk) in (("dense", identity), ("COO", x -> coo_arr(identity, x))),
+            solver in (:lsmr, Val(:lsqr), :cgls, Val(:crls))
         A = mk(Float64.(M))
-        S, D = curtis_reid_scaling!(A)
+        S, D = curtis_reid_scaling!(A; solver)
         @test D isa CurtisReidScaling
         @test reconstructs(S, Float64.(M), D)
     end
+    @test_throws ArgumentError curtis_reid_scaling(Float64.(MATRICES[1]); solver = :nonsense)
+    @test_throws ArgumentError curtis_reid_scaling(Float64.(MATRICES[1]); solver = Val(:nonsense))
 end
 
 @testset "CPU edge cases" begin

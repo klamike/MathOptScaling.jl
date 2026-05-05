@@ -1,11 +1,20 @@
 module MathOptScalingKrylovExt
 
-using Krylov: lsmr
+using Krylov: cgls, crls, lslq, lsmr, lsqr
 using SparseArrays: SparseArrays, sparse
 using MathOptScaling
 import MathOptScaling: SparseCOO, CurtisReidWorkspace, scale_rows_cols!
 
 const MOS = MathOptScaling
+
+_solve(s::Symbol, F, b; kwargs...) = _solve(Val(s), F, b; kwargs...)
+_solve(::Val{:lsmr}, F, b; kwargs...) = lsmr(F, b; kwargs...)
+_solve(::Val{:lsqr}, F, b; kwargs...) = lsqr(F, b; kwargs...)
+_solve(::Val{:lslq}, F, b; kwargs...) = lslq(F, b; kwargs...)
+_solve(::Val{:cgls}, F, b; kwargs...) = cgls(F, b; kwargs...)
+_solve(::Val{:crls}, F, b; kwargs...) = crls(F, b; kwargs...)
+_solve(::Val{S}, F, b; kwargs...) where {S} =
+    throw(ArgumentError("unsupported Krylov solver $(repr(S)); use one of :lsmr, :lsqr, :lslq, :cgls, :crls"))
 
 function _ls_problem(A::AbstractMatrix{T}) where {T<:AbstractFloat}
     m, n = size(A)
@@ -34,10 +43,10 @@ function _ls_problem(A::SparseCOO{T}) where {T<:AbstractFloat}
     return sparse(rows, cols, vals, length(rhs), A.m + A.n), rhs
 end
 
-function MOS.curtis_reid_scaling!(A, ws::CurtisReidWorkspace; kwargs...)
+function MOS.curtis_reid_scaling!(A, ws::CurtisReidWorkspace; solver = Val(:lsmr), kwargs...)
     drow, dcol = ws.scaling.row, ws.scaling.col
     F, b = _ls_problem(ws.storage)
-    x, _ = lsmr(F, b; kwargs...)
+    x, _ = _solve(solver, F, b; kwargs...)
     m = size(ws.storage, 1)
     rscale = exp.(view(x, 1:m))
     cscale = exp.(view(x, m+1:length(x)))
