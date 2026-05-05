@@ -7,7 +7,9 @@ using MathOptScaling:
     SymmetricRuizScaling, SymmetricRuizWorkspace, symmetric_ruiz_equilibration, symmetric_ruiz_equilibration!,
     DiagonalScaling, DiagonalNormWorkspace, diagonal_norm_scaling, diagonal_norm_scaling!,
     ChambollePockScaling, ChambollePockWorkspace, chambolle_pock_scaling, chambolle_pock_scaling!,
-    TomlinScaling, TomlinWorkspace, tomlin_scaling, tomlin_scaling!, tomlin_converged
+    TomlinScaling, TomlinWorkspace, tomlin_scaling, tomlin_scaling!, tomlin_converged,
+    CurtisReidScaling, CurtisReidWorkspace, curtis_reid_scaling, curtis_reid_scaling!,
+    CurtisReidScaling, CurtisReidWorkspace, curtis_reid_scaling, curtis_reid_scaling!
 
 include("matrices.jl")
 
@@ -31,7 +33,7 @@ end
 reconstructs(S, A, D) =
     densify(S) ≈ Diagonal(Array(D.row)) * Matrix(A) * Diagonal(Array(D.col))
 
-function run_backend_tests(label, to, T = Float64; eps = sqrt(Base.eps(T)))
+function run_backend_tests(label, to, T = Float64; eps = sqrt(Base.eps(T)), curtis_reid = true)
     forms = (("dense", M -> dense_arr(to, M)), ("COO", M -> coo_arr(to, M)))
     algos = (
         ("Ruiz",            X -> ruiz_equilibration!(X; eps)),
@@ -41,11 +43,22 @@ function run_backend_tests(label, to, T = Float64; eps = sqrt(Base.eps(T)))
         ("ChambollePock-2", X -> chambolle_pock_scaling!(X; alpha = 2)),
         ("Tomlin",          X -> tomlin_scaling!(X; check = false)),
     )
+    coo_only_algos = curtis_reid ? (
+        ("CurtisReid:lsmr", X -> curtis_reid_scaling!(X; solver = :lsmr)),
+        ("CurtisReid:lsqr", X -> curtis_reid_scaling!(X; solver = Val(:lsqr))),
+        ("CurtisReid:lslq", X -> curtis_reid_scaling!(X; solver = :lslq)),
+        ("CurtisReid:cgls", X -> curtis_reid_scaling!(X; solver = :cgls)),
+        ("CurtisReid:crls", X -> curtis_reid_scaling!(X; solver = Val(:crls))),
+    ) : ()
     @testset "$label $T" begin
         for (i, M) in enumerate(MATRICES)
             A = T.(M)
             @testset "M$i $fname / $aname" for (fname, mk) in forms, (aname, run!) in algos
                 S, D = run!(mk(A))
+                @test reconstructs(S, A, D)
+            end
+            @testset "M$i COO / $aname" for (aname, run!) in coo_only_algos
+                S, D = run!(coo_arr(to, A))
                 @test reconstructs(S, A, D)
             end
             size(M, 1) == size(M, 2) || continue

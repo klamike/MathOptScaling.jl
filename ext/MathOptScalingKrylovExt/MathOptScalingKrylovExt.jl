@@ -1,9 +1,9 @@
 module MathOptScalingKrylovExt
 
 using Krylov: cgls, crls, lslq, lsmr, lsqr
-using SparseArrays: SparseArrays, sparse
+using SparseArrays: sparse
 using MathOptScaling
-import MathOptScaling: SparseCOO, CurtisReidWorkspace, scale_rows_cols!
+import MathOptScaling: SparseCOO, CurtisReidWorkspace, scale_rows_cols!, _build_ls_matrix
 
 const MOS = MathOptScaling
 
@@ -16,44 +16,36 @@ _solve(::Val{:crls}, F, b; kwargs...) = crls(F, b; kwargs...)
 _solve(::Val{S}, F, b; kwargs...) where {S} =
     throw(ArgumentError("unsupported Krylov solver $(repr(S)); use one of :lsmr, :lsqr, :lslq, :cgls, :crls"))
 
-function _ls_problem(A::AbstractMatrix{T}) where {T<:AbstractFloat}
-    m, n = size(A)
-    rows, cols, vals, rhs = Int[], Int[], T[], T[]
-    @inbounds for j in 1:n, i in 1:m
-        v = A[i, j]
-        iszero(v) && continue
-        k = length(rhs) + 1
-        push!(rows, k); push!(cols, i); push!(vals, one(T))
-        push!(rows, k); push!(cols, m + j); push!(vals, one(T))
-        push!(rhs, -log(abs(v)))
+function MOS._build_ls_matrix(::Type{T}, rowval::Vector{Ti}, colval::Vector{Ti}, m::Integer, n::Integer) where {T<:AbstractFloat,Ti}
+    nz = length(rowval)
+    rows = Vector{Ti}(undef, 2nz)
+    cols = Vector{Ti}(undef, 2nz)
+    vals = ones(T, 2nz)
+    @inbounds for k in 1:nz
+        rows[2k - 1] = k; cols[2k - 1] = rowval[k]
+        rows[2k]     = k; cols[2k]     = m + colval[k]
     end
-    return sparse(rows, cols, vals, length(rhs), m + n), rhs
+    return sparse(rows, cols, vals, nz, m + n)
 end
 
-function _ls_problem(A::SparseCOO{T}) where {T<:AbstractFloat}
-    rows, cols, vals, rhs = Int[], Int[], T[], T[]
-    @inbounds for k in eachindex(A.nzval)
-        v = A.nzval[k]
-        iszero(v) && continue
-        kk = length(rhs) + 1
-        push!(rows, kk); push!(cols, A.rowval[k]); push!(vals, one(T))
-        push!(rows, kk); push!(cols, A.m + A.colval[k]); push!(vals, one(T))
-        push!(rhs, -log(abs(v)))
-    end
-    return sparse(rows, cols, vals, length(rhs), A.m + A.n), rhs
-end
+MOS._build_ls_matrix(::Type{T}, rowval::AbstractVector, colval::AbstractVector, m, n) where {T} =
+    throw(ArgumentError("Curtis Reid only supports CPU, CUDA, and AMDGPU."))
 
 function MOS.curtis_reid_scaling!(A, ws::CurtisReidWorkspace; solver = Val(:lsmr), kwargs...)
+    ws.storage isa SparseCOO || throw(ArgumentError("curtis_reid_scaling! requires a SparseCOO input"))
     drow, dcol = ws.scaling.row, ws.scaling.col
-    F, b = _ls_problem(ws.storage)
+    storage = ws.storage
+    T = eltype(storage.nzval)
+    F = MOS._build_ls_matrix(T, storage.rowval, storage.colval, storage.m, storage.n)
+    b = .-log.(abs.(storage.nzval))
     x, _ = _solve(solver, F, b; kwargs...)
-    m = size(ws.storage, 1)
-    rscale = exp.(view(x, 1:m))
-    cscale = exp.(view(x, m+1:length(x)))
-    scale_rows_cols!(ws.storage, rscale, cscale)
-    drow .*= rscale
-    dcol .*= cscale
-    return ws.storage, ws.scaling
+    m = size(storage, 1)
+    copyto!(ws.rscale, exp.(view(x, 1:m)))
+    copyto!(ws.cscale, exp.(view(x, m+1:length(x))))
+    scale_rows_cols!(storage, ws.rscale, ws.cscale)
+    drow .*= ws.rscale
+    dcol .*= ws.cscale
+    return storage, ws.scaling
 end
 
 end

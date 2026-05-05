@@ -1,7 +1,6 @@
 include("shared.jl")
 
 using Krylov  # loads MathOptScalingKrylovExt
-using MathOptScaling: CurtisReidScaling, CurtisReidWorkspace, curtis_reid_scaling, curtis_reid_scaling!
 
 @testset "README example" begin
     A = [
@@ -16,21 +15,15 @@ end
 
 run_backend_tests("CPU", identity)
 
-@testset "CurtisReid" begin
-    @testset "M$i / $fname / $solver" for
-            (i, M) in enumerate(MATRICES),
-            (fname, mk) in (("dense", identity), ("COO", x -> coo_arr(identity, x))),
-            solver in (:lsmr, Val(:lsqr), :cgls, Val(:crls))
-        A = mk(Float64.(M))
-        S, D = curtis_reid_scaling!(A; solver)
-        @test D isa CurtisReidScaling
-        @test reconstructs(S, Float64.(M), D)
-    end
-    @test_throws ArgumentError curtis_reid_scaling(Float64.(MATRICES[1]); solver = :nonsense)
-    @test_throws ArgumentError curtis_reid_scaling(Float64.(MATRICES[1]); solver = Val(:nonsense))
-end
-
 @testset "CPU edge cases" begin
+    @testset "CurtisReid input/solver" begin
+        A_dense = Float64.(MATRICES[1])
+        A_coo = coo_arr(identity, A_dense)
+        @test_throws ArgumentError curtis_reid_scaling(A_dense)
+        @test_throws ArgumentError curtis_reid_scaling(A_coo; solver = :nonsense)
+        @test_throws ArgumentError curtis_reid_scaling(A_coo; solver = Val(:nonsense))
+    end
+
     @testset "zero matrix" begin
         for Z in (zeros(3, 4), coo_arr(identity, spzeros(3, 4)))
             S, D = ruiz_equilibration(Z)
