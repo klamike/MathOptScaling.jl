@@ -7,7 +7,7 @@ using MathOptScaling:
     SymmetricRuizScaling, SymmetricRuizWorkspace, symmetric_ruiz_equilibration, symmetric_ruiz_equilibration!,
     DiagonalScaling, DiagonalNormWorkspace, diagonal_norm_scaling, diagonal_norm_scaling!,
     ChambollePockScaling, ChambollePockWorkspace, chambolle_pock_scaling, chambolle_pock_scaling!,
-    GeometricMeanScaling, GeometricMeanWorkspace, geometric_mean_scaling, geometric_mean_scaling!, geometric_mean_converged
+    TomlinScaling, TomlinWorkspace, tomlin_scaling, tomlin_scaling!, tomlin_converged
 
 include("matrices.jl")
 
@@ -39,7 +39,7 @@ function run_backend_tests(label, to, T = Float64; eps = sqrt(Base.eps(T)))
         ("ChambollePock-0", X -> chambolle_pock_scaling!(X; alpha = 0)),
         ("ChambollePock-1", X -> chambolle_pock_scaling!(X; alpha = 1)),
         ("ChambollePock-2", X -> chambolle_pock_scaling!(X; alpha = 2)),
-        ("GeometricMean",   X -> geometric_mean_scaling!(X; check = false)),
+        ("Tomlin",          X -> tomlin_scaling!(X; check = false)),
     )
     @testset "$label $T" begin
         for (i, M) in enumerate(MATRICES)

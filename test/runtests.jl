@@ -1,5 +1,8 @@
 include("shared.jl")
 
+using Krylov  # loads MathOptScalingKrylovExt
+using MathOptScaling: CurtisReidScaling, CurtisReidWorkspace, curtis_reid_scaling, curtis_reid_scaling!
+
 @testset "README example" begin
     A = [
         100.0 0.0 3.0;
@@ -12,6 +15,15 @@ include("shared.jl")
 end
 
 run_backend_tests("CPU", identity)
+
+@testset "CurtisReid" begin
+    @testset "M$i / $fname" for (i, M) in enumerate(MATRICES), (fname, mk) in (("dense", identity), ("COO", x -> coo_arr(identity, x)))
+        A = mk(Float64.(M))
+        S, D = curtis_reid_scaling!(A)
+        @test D isa CurtisReidScaling
+        @test reconstructs(S, Float64.(M), D)
+    end
+end
 
 @testset "CPU edge cases" begin
     @testset "zero matrix" begin
@@ -44,9 +56,9 @@ run_backend_tests("CPU", identity)
         end
     end
 
-    @testset "geometric mean already converged" begin
-        S, _ = geometric_mean_scaling([2.0 0.0; 0.0 8.0]; max_iter = 1, check = false)
+    @testset "Tomlin already converged" begin
+        S, _ = tomlin_scaling([2.0 0.0; 0.0 8.0]; max_iter = 1, check = false)
         @test S ≈ I(2)
-        @test geometric_mean_converged(GeometricMeanWorkspace(S); eps = 1e-12)
+        @test tomlin_converged(TomlinWorkspace(S); eps = 1e-12)
     end
 end

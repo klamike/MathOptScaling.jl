@@ -1,9 +1,16 @@
-struct GeometricMeanScaling{R,C}
+"""
+Tomlin (1975) iterative scaling: at each step, rescale each row by `1/√(min · max)`
+of its absolute nonzeros, then do the same for columns. Often called "geometric mean
+scaling" in solver literature, where the geometric mean is taken over (min, max) only,
+not over all entries.
+"""
+
+struct TomlinScaling{R,C}
     row::R
     col::C
 end
 
-struct GeometricMeanWorkspace{S,R,C,W}
+struct TomlinWorkspace{S,R,C,W}
     scaling::S
     rscale::R
     cscale::C
@@ -14,12 +21,12 @@ struct GeometricMeanWorkspace{S,R,C,W}
     storage::W
 end
 
-geometric_mean_scaling(A; kwargs...) = geometric_mean_scaling!(copy(A); kwargs...)
+tomlin_scaling(A; kwargs...) = tomlin_scaling!(copy(A); kwargs...)
 
-function GeometricMeanWorkspace(A)
+function TomlinWorkspace(A)
     drow, dcol = scaling_vectors(A)
-    return GeometricMeanWorkspace(
-        GeometricMeanScaling(drow, dcol),
+    return TomlinWorkspace(
+        TomlinScaling(drow, dcol),
         similar(drow), similar(dcol),
         similar(drow), similar(drow),
         similar(dcol), similar(dcol),
@@ -27,14 +34,14 @@ function GeometricMeanWorkspace(A)
     )
 end
 
-geometric_mean_scaling!(A; kwargs...) =
-    geometric_mean_scaling!(A, GeometricMeanWorkspace(A); kwargs...)
+tomlin_scaling!(A; kwargs...) =
+    tomlin_scaling!(A, TomlinWorkspace(A); kwargs...)
 
-geometric_mean_scaling!(A, ws::GeometricMeanWorkspace; kwargs...) =
-    run_iterative_scaling!(ws; step! = geometric_mean_step!,
-        check_converged! = geometric_mean_step_converged, converged! = geometric_mean_converged, kwargs...)
+tomlin_scaling!(A, ws::TomlinWorkspace; kwargs...) =
+    run_iterative_scaling!(ws; step! = tomlin_step!,
+        check_converged! = tomlin_step_converged, converged! = tomlin_converged, kwargs...)
 
-function geometric_mean_step!(ws::GeometricMeanWorkspace)
+function tomlin_step!(ws::TomlinWorkspace)
     drow, dcol = ws.scaling.row, ws.scaling.col
 
     row_minmaxabs!(ws.rowmin, ws.rowmax, ws.colmin, ws.colmax, ws.storage)
@@ -49,13 +56,13 @@ function geometric_mean_step!(ws::GeometricMeanWorkspace)
     return ws.storage
 end
 
-function geometric_mean_step_converged(ws::GeometricMeanWorkspace; eps = DEFAULT_EPS)
+function tomlin_step_converged(ws::TomlinWorkspace; eps = DEFAULT_EPS)
     return norms_converged(ws.rscale; eps) && norms_converged(ws.cscale; eps)
 end
 
-function geometric_mean_converged(ws::GeometricMeanWorkspace; eps = DEFAULT_EPS)
+function tomlin_converged(ws::TomlinWorkspace; eps = DEFAULT_EPS)
     row_col_minmaxabs!(ws.rowmin, ws.rowmax, ws.colmin, ws.colmax, ws.storage)
     geometric_factors!(ws.rscale, ws.rowmin, ws.rowmax)
     geometric_factors!(ws.cscale, ws.colmin, ws.colmax)
-    return geometric_mean_step_converged(ws; eps)
+    return tomlin_step_converged(ws; eps)
 end
